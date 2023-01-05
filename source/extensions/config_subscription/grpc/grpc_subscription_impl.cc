@@ -59,6 +59,7 @@ void GrpcSubscriptionImpl::updateResourceInterest(
 
 void GrpcSubscriptionImpl::requestOnDemandUpdate(
     const absl::flat_hash_set<std::string>& for_update) {
+  watch_->add(for_update);
   grpc_mux_->requestOnDemandUpdate(type_url_, for_update);
   stats_.update_attempt_.inc();
 }

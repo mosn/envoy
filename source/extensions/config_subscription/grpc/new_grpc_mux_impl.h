@@ -141,6 +141,10 @@ private:
       parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
+    void add(const absl::flat_hash_set<std::string>& resources) override {
+      parent_.addWatchInterest(type_url_, watch_, resources, options_);
+    }
+
   private:
     const std::string type_url_;
     Watch* watch_;
@@ -163,6 +167,14 @@ private:
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
+
+  void addWatchInterest(const std::string& type_url, Watch* watch,
+                        const absl::flat_hash_set<std::string>& resources,
+                        const SubscriptionOptions& options);
+
+  void updateWatchHelper(const std::string& type_url, Watch* watch,
+                         const absl::flat_hash_set<std::string>& resources,
+                         const SubscriptionOptions& options, bool add);
 
   // Adds a subscription for the type_url to the subscriptions map and order list.
   void addSubscription(const std::string& type_url, bool use_namespace_matching);

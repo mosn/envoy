@@ -149,6 +149,8 @@ private:
       parent_.queueDiscoveryRequest(type_url_);
     }
 
+    void add(const absl::flat_hash_set<std::string>&) override {}
+
     // Maintain deterministic wire ordering via ordered std::set.
     std::set<std::string> resources_;
     SubscriptionCallbacks& callbacks_;

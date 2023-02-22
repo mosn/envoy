@@ -33,18 +33,13 @@ DsoInstancePtr DsoInstanceManager::getDsoInstanceByID(std::string dso_id) {
 }
 
 template <typename T>
-bool dlsymInternal(T& fn, void* handler, const std::string name, const std::string symbol) {
-  if (!handler) {
-    return false;
-  }
-
+void dlsymInternal(T& fn, void* handler, const std::string name, const std::string symbol,
+                   bool* loaded) {
   fn = reinterpret_cast<T>(dlsym(handler, symbol.c_str()));
   if (!fn) {
     ENVOY_LOG_MISC(error, "lib: {}, cannot find symbol: {}, err: {}", name, symbol, dlerror());
-    return false;
+    *loaded = false;
   }
-
-  return true;
 }
 
 DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
@@ -56,23 +51,25 @@ DsoInstance::DsoInstance(const std::string dso_name) : dso_name_(dso_name) {
     return;
   }
 
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_new_http_plugin_config_)>(
+  loaded_ = true;
+
+  dlsymInternal<decltype(envoy_go_filter_new_http_plugin_config_)>(
       envoy_go_filter_new_http_plugin_config_, handler_, dso_name,
-      "envoyGoFilterNewHttpPluginConfig");
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_merge_http_plugin_config_)>(
+      "envoyGoFilterNewHttpPluginConfig", &loaded_);
+  dlsymInternal<decltype(envoy_go_filter_merge_http_plugin_config_)>(
       envoy_go_filter_merge_http_plugin_config_, handler_, dso_name,
-      "envoyGoFilterMergeHttpPluginConfig");
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_header_)>(
-      envoy_go_filter_on_http_header_, handler_, dso_name, "envoyGoFilterOnHttpHeader");
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_data_)>(
-      envoy_go_filter_on_http_data_, handler_, dso_name, "envoyGoFilterOnHttpData");
-  loaded_ = dlsymInternal<decltype(envoy_go_filter_on_http_destroy_)>(
-      envoy_go_filter_on_http_destroy_, handler_, dso_name, "envoyGoFilterOnHttpDestroy");
-  loaded_ = dlsymInternal<decltype(envoy_go_cluster_specifier_new_plugin_)>(
+      "envoyGoFilterMergeHttpPluginConfig", &loaded_);
+  dlsymInternal<decltype(envoy_go_filter_on_http_header_)>(
+      envoy_go_filter_on_http_header_, handler_, dso_name, "envoyGoFilterOnHttpHeader", &loaded_);
+  dlsymInternal<decltype(envoy_go_filter_on_http_data_)>(
+      envoy_go_filter_on_http_data_, handler_, dso_name, "envoyGoFilterOnHttpData", &loaded_);
+  dlsymInternal<decltype(envoy_go_filter_on_http_destroy_)>(
+      envoy_go_filter_on_http_destroy_, handler_, dso_name, "envoyGoFilterOnHttpDestroy", &loaded_);
+  dlsymInternal<decltype(envoy_go_cluster_specifier_new_plugin_)>(
       envoy_go_cluster_specifier_new_plugin_, handler_, dso_name,
-      "envoyGoClusterSpecifierNewPlugin");
-  loaded_ = dlsymInternal<decltype(envoy_go_on_cluster_specify_)>(
-      envoy_go_on_cluster_specify_, handler_, dso_name, "envoyGoOnClusterSpecify");
+      "envoyGoClusterSpecifierNewPlugin", &loaded_);
+  dlsymInternal<decltype(envoy_go_on_cluster_specify_)>(
+      envoy_go_on_cluster_specify_, handler_, dso_name, "envoyGoOnClusterSpecify", &loaded_);
 }
 
 DsoInstance::~DsoInstance() {

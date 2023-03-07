@@ -1,0 +1,14 @@
+config {
+  library_id: "%"
+  library_path: "\017\000\000\000"
+  plugin_name: "\017\000\000\000"
+  plugin_config {
+    value: "\017\000\000\000"
+  }
+}
+request_data {
+  http_body {
+    data: "\177\023"
+  }
+}
+

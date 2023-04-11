@@ -19,8 +19,6 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
 
-SINGLETON_MANAGER_REGISTRATION(dfp_cluster_store);
-
 Cluster::Cluster(
     Server::Configuration::ServerFactoryContext& server_context,
     const envoy::config::cluster::v3::Cluster& cluster,
@@ -46,7 +44,7 @@ Cluster::Cluster(
     if (sub_cluster_type_ !=
             envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS &&
         sub_cluster_type_ !=
-            envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_LOGIC_DNS) {
+            envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_LOGICAL_DNS) {
       throw EnvoyException(fmt::format("unsupported sub cluster type '{}' in sub_cluster_config",
                                        sub_cluster_type_));
     }
@@ -75,7 +73,7 @@ bool Cluster::touch(const std::string& cluster_name) {
     cluster_it->second->touch();
     return true;
   }
-  ENVOY_LOG(debug, "cluster='{}' is removed while touching", cluster_name);
+  ENVOY_LOG(debug, "cluster='{}' has been removed while touching", cluster_name);
   return false;
 }
 

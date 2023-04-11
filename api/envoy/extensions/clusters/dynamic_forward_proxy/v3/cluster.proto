@@ -27,10 +27,23 @@ message ClusterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig";
 
-  // The DNS cache configuration that the cluster will attach to. Note this configuration must
-  // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
-  // <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`.
-  common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1;
+  oneof cluster_implementation_specifier {
+    // The DNS cache configuration that the cluster will attach to. Note this configuration must
+    // match that of associated :ref:`dynamic forward proxy HTTP filter configuration
+    // <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`.
+    common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 1;
+
+    // Configuration for sub clusters, when this configuration is enabled,
+    // Envoy will create a independent sub cluster dynamically for each host:port.
+    // Most of the configuration of a sub cluster is inherit of the current cluster,
+    // i.e. lb_policy, health_checks and etc.
+    // And the load_assignment will be set to the only one endpoint, host:port.
+    // Compared to the dns_cache_config, it has the following advantages:
+    // 1. a sub cluster could be specified with the STRICT_DNS DiscoveryType,
+    //    so that Envoy will use all of the IPs resolved from the host.
+    // 2. each sub cluster is full featured cluster, with lb and health check and etc enabled.
+    SubClustersConfig sub_clusters_config = 4;
+  }
 
   // If true allow the cluster configuration to disable the auto_sni and auto_san_validation options
   // in the :ref:`cluster's upstream_http_protocol_options
@@ -56,21 +69,35 @@ message ClusterConfig {
   //   <https://datatracker.ietf.org/doc/html/rfc7540#section-9.1.1>`_
   //
   bool allow_coalesced_connections = 3;
-
-  // Enable strict dns sub cluster instead logic dns.
-  SubClustersConfig sub_clusters_config = 4;
 }
 
 message SubClustersConfig {
+  // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
+  // for an explanation on each type.
+  enum DiscoveryType {
+    // Refer to the :ref:`strict DNS discovery
+    // type<arch_overview_service_discovery_types_strict_dns>`
+    // for an explanation.
+    STRICT_DNS = 1;
+
+    // Refer to the :ref:`logical DNS discovery
+    // type<arch_overview_service_discovery_types_logical_dns>`
+    // for an explanation.
+    LOGICAL_DNS = 2;
+  }
+
+  // Only STRICT_DNS and LOGICAL_DNS are supported.
+  DiscoveryType type = 1 [(validate.rules).enum = {defined_only: true}];
+
   // The maximum number of sub clusters that the DFP cluster will hold. If not specified defaults to 1024.
-  google.protobuf.UInt32Value max_sub_clusters = 1 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_sub_clusters = 2 [(validate.rules).uint32 = {gt: 0}];
 
   // The TTL for sub clusters that are unused. Sub clusters that have not been used in the configured time
   // interval will be purged. If not specified defaults to 5m.
-  google.protobuf.Duration sub_cluster_ttl = 2 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration sub_cluster_ttl = 3 [(validate.rules).duration = {gt {}}];
 
   // Sub clusters that should be created & warmed upon creation. This might provide a
   // performance improvement, in the form of cache hits, for sub clusters that are going to be
   // warmed during steady state and are known at config load time.
-  repeated config.core.v3.SocketAddress preresolve_clusters = 3;
+  repeated config.core.v3.SocketAddress preresolve_clusters = 4;
 }

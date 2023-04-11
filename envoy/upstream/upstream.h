@@ -833,12 +833,6 @@ class TypedLoadBalancerFactory;
 using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(
     const Network::Address::InstanceConstSharedPtr&)>;
 
-class Cluster;
-
-using ClusterSharedPtr = std::shared_ptr<Cluster>;
-using ClusterWeakPtr = std::weak_ptr<Cluster>;
-using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
-
 /**
  * Information about a given upstream cluster.
  * This includes the information and interfaces for building an upstream filter chain.
@@ -1268,6 +1262,10 @@ public:
    */
   virtual const PrioritySet& prioritySet() const PURE;
 };
+
+using ClusterSharedPtr = std::shared_ptr<Cluster>;
+using ClusterWeakPtr = std::weak_ptr<Cluster>;
+using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>;
 
 } // namespace Upstream
 } // namespace Envoy

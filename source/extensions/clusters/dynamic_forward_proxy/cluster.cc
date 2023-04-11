@@ -33,12 +33,8 @@ Cluster::Cluster(
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
-      main_thread_dispatcher_(server_context.mainThreadDispatcher()),
-      refresh_interval_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), dns_refresh_rate, 60000)),
-      host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), host_ttl, 300000)),
-      orig_cluster_config_(cluster), orig_dfp_config_(config),
-      allow_coalesced_connections_(config.allow_coalesced_connections()),
+      main_thread_dispatcher_(server_context.mainThreadDispatcher()), orig_cluster_config_(cluster),
+      orig_dfp_config_(config), allow_coalesced_connections_(config.allow_coalesced_connections()),
       cm_(context.clusterManager()), max_sub_clusters_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                          config.sub_clusters_config(), max_sub_clusters, 1024)),
       sub_cluster_ttl_(
@@ -47,7 +43,7 @@ Cluster::Cluster(
 
   if (enable_sub_cluster_) {
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(refresh_interval_);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(sub_cluster_ttl_);
     idle_timer_->enableTimer(ms);
   }
 }
@@ -91,7 +87,7 @@ void Cluster::checkIdleSubCluster() {
       }
     }
   }
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(refresh_interval_);
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(sub_cluster_ttl_);
   idle_timer_->enableTimer(ms);
 }
 
@@ -112,24 +108,16 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
     }
     cluster_map_.emplace(cluster_name, std::make_shared<ClusterInfo>(cluster_name, *this));
   }
+
+  // Inherit configuration from the parent DFP cluster.
   auto config = std::make_unique<envoy::config::cluster::v3::Cluster>(orig_cluster_config_);
 
-  config->set_dns_lookup_family(orig_dfp_config_.dns_cache_config().dns_lookup_family());
-
-  // overwrite to a strict_dns cluster.
+  // Overwrite the type.
   config->set_name(cluster_name);
   config->clear_cluster_type();
-  config->set_type(
-      envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS);
-  config->set_lb_policy(envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_ROUND_ROBIN);
+  config->set_type(orig_dfp_config_.type());
 
-  /*
-    config->set_dns_lookup_family(
-        envoy::config::cluster::v3::Cluster_DnsLookupFamily::Cluster_DnsLookupFamily_V4_ONLY);
-    config->mutable_connect_timeout()->CopyFrom(
-        Protobuf::util::TimeUtil::MillisecondsToDuration(parent_info->connectTimeout().count()));
-  */
-
+  // Set endpoint.
   auto load_assignments = config->mutable_load_assignment();
   load_assignments->set_cluster_name(cluster_name);
   load_assignments->clear_endpoints();
@@ -188,9 +176,9 @@ bool Cluster::ClusterInfo::checkIdle() {
       parent_.main_thread_dispatcher_.timeSource().monotonicTime().time_since_epoch();
   auto last_used_time = last_used_time_.load();
   ENVOY_LOG(debug, "cluster='{}' TTL check: now={} last_used={} TTL {}", cluster_name_,
-            now_duration.count(), last_used_time.count(), parent_.host_ttl_.count());
+            now_duration.count(), last_used_time.count(), parent_.sub_cluster_ttl_.count());
 
-  if ((now_duration - last_used_time) > parent_.host_ttl_) {
+  if ((now_duration - last_used_time) > parent_.sub_cluster_ttl_) {
     ENVOY_LOG(debug, "cluster='{}' TTL expired", cluster_name_);
     return true;
   }

@@ -167,8 +167,6 @@ private:
   const envoy::config::endpoint::v3::LbEndpoint dummy_lb_endpoint_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& main_thread_dispatcher_;
-  const std::chrono::milliseconds refresh_interval_;
-  const std::chrono::milliseconds host_ttl_;
   const envoy::config::cluster::v3::Cluster orig_cluster_config_;
   const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig orig_dfp_config_;
 

@@ -181,10 +181,11 @@ private:
   ClusterInfoMap cluster_map_ ABSL_GUARDED_BY(cluster_map_lock_);
 
   Upstream::ClusterManager& cm_;
-  const size_t max_sub_clusters_{0};
+  const size_t max_sub_clusters_;
   const std::chrono::milliseconds sub_cluster_ttl_;
   const envoy::config::cluster::v3::Cluster_DiscoveryType sub_cluster_type_;
-  bool enable_sub_cluster_;
+  const envoy::config::cluster::v3::Cluster_LbPolicy sub_cluster_lb_policy_;
+  const bool enable_sub_cluster_;
 
   friend class ClusterFactory;
   friend class ClusterTest;

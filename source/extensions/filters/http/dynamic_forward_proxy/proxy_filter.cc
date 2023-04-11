@@ -341,6 +341,7 @@ void ProxyFilter::onLoadClusterComplete() {
 void ProxyFilter::onClusterInitTimeout() {
   latchTime(decoder_callbacks_, DNS_END);
   ENVOY_STREAM_LOG(debug, "load cluster failed, aborting", *decoder_callbacks_);
+  cluster_load_handle_.reset();
   decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                      ResponseStrings::get().SubClusterWarmingTimeout, nullptr,
                                      absl::nullopt, RcDetails::get().SubClusterWarmingTimeout);

@@ -38,6 +38,7 @@ Cluster::Cluster(
       sub_cluster_ttl_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
       sub_cluster_type_(config.sub_clusters_config().type()),
+      sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
       enable_sub_cluster_(config.has_sub_clusters_config()) {
 
   if (enable_sub_cluster_) {
@@ -47,6 +48,10 @@ Cluster::Cluster(
             envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_LOGICAL_DNS) {
       throw EnvoyException(fmt::format("unsupported sub cluster type '{}' in sub_cluster_config",
                                        sub_cluster_type_));
+    }
+    if (sub_cluster_lb_policy_ ==
+        envoy::config::cluster::v3::Cluster_LbPolicy::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+      throw EnvoyException("unsupported lb_policy 'CLUSTER_PROVIDED' in sub_cluster_config");
     }
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
     idle_timer_->enableTimer(sub_cluster_ttl_);
@@ -105,7 +110,7 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
       cluster_it->second->touch();
       return std::make_pair(true, nullptr);
     }
-    if (max_sub_clusters_ > 0 && cluster_map_.size() >= max_sub_clusters_) {
+    if (cluster_map_.size() >= max_sub_clusters_) {
       ENVOY_LOG(debug, "cluster='{}' create failed due to max sub cluster limitation",
                 cluster_name);
       return std::make_pair(false, nullptr);
@@ -120,6 +125,7 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   config->set_name(cluster_name);
   config->clear_cluster_type();
   config->set_type(sub_cluster_type_);
+  config->set_lb_policy(sub_cluster_lb_policy_);
 
   // Set endpoint.
   auto load_assignments = config->mutable_load_assignment();

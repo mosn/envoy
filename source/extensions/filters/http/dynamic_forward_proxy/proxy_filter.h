@@ -56,7 +56,7 @@ public:
   void onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) override;
   void onClusterRemoval(const std::string&) override;
 
-  bool enableStrictDnsCluster() const { return enable_strict_dns_cluster_; }
+  bool enableSubCluster() const { return enable_sub_cluster_; }
 
 private:
   struct LoadClusterEntryHandleImpl
@@ -88,7 +88,7 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   ThreadLocal::TypedSlot<ThreadLocalClusterInfo> tls_slot_;
   const bool save_upstream_address_;
-  const bool enable_strict_dns_cluster_;
+  const bool enable_sub_cluster_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;

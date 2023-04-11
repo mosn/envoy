@@ -1198,16 +1198,6 @@ public:
    */
   virtual Http::HeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
-  /**
-   * Setting the cluster that owning this info, only for dynamic forward proxy cluster.
-   */
-  virtual void cluster(ClusterSharedPtr) const PURE;
-
-  /**
-   * @return the cluster that owning this info, only for dynamic forward proxy cluster.
-   */
-  virtual ClusterSharedPtr cluster() const PURE;
-
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

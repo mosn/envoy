@@ -10,6 +10,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/upstream_address.h"
+#include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,8 +53,7 @@ ProxyFilterConfig::ProxyFilterConfig(
       cluster_manager_(context.clusterManager()),
       main_thread_dispatcher_(context.mainThreadDispatcher()), tls_slot_(context.threadLocal()),
       save_upstream_address_(proto_config.save_upstream_address()),
-      enable_strict_dns_cluster_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_strict_dns_sub_cluster_for_dfp_cluster")) {
+      enable_sub_cluster_(proto_config.has_cluster_init_timeout()) {
   tls_slot_.set(
       [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalClusterInfo>(*this); });
 }
@@ -203,7 +203,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     }
   }
 
-  if (config_->enableStrictDnsCluster()) {
+  if (config_->enableSubCluster()) {
     return loadDynamicCluster(headers, default_port);
   }
 
@@ -269,7 +269,8 @@ Http::FilterHeadersStatus ProxyFilter::loadDynamicCluster(Http::RequestHeaderMap
   // TODO: another cluster type when it's an IP.
   // host_attributes.is_ip_address_;
 
-  Upstream::ClusterSharedPtr cluster = cluster_info_->cluster();
+  Upstream::ClusterSharedPtr cluster =
+      Common::DynamicForwardProxy::DFPClusterStore::load(cluster_info_->name());
   if (cluster == nullptr) {
     // TODO: local reply
     PANIC("TODO");

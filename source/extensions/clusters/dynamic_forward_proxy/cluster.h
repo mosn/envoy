@@ -43,7 +43,7 @@ public:
                                Network::DnsResolver::ResolutionStatus) override {}
 
   bool allowCoalescedConnections() const { return allow_coalesced_connections_; }
-  bool enableStrictDnsCluster() const { return enable_strict_dns_cluster_; }
+  bool enableSubCluster() const { return enable_sub_cluster_; }
   Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
                                           Upstream::LoadBalancerContext* context);
   std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
@@ -169,7 +169,6 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds host_ttl_;
-  const size_t max_sub_clusters_{0};
   const envoy::config::cluster::v3::Cluster orig_cluster_config_;
   const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig orig_dfp_config_;
 
@@ -185,7 +184,9 @@ private:
   ClusterInfoMap cluster_map_ ABSL_GUARDED_BY(cluster_map_lock_);
 
   Upstream::ClusterManager& cm_;
-  bool enable_strict_dns_cluster_;
+  const size_t max_sub_clusters_{0};
+  const std::chrono::milliseconds sub_cluster_ttl_;
+  bool enable_sub_cluster_;
 
   friend class ClusterFactory;
   friend class ClusterTest;

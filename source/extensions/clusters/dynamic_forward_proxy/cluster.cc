@@ -9,6 +9,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -17,6 +18,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
+
+SINGLETON_MANAGER_REGISTRATION(dfp_cluster_store);
 
 Cluster::Cluster(
     Server::Configuration::ServerFactoryContext& server_context,
@@ -34,15 +37,15 @@ Cluster::Cluster(
       refresh_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), dns_refresh_rate, 60000)),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config.dns_cache_config(), host_ttl, 300000)),
-      max_sub_clusters_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.dns_cache_config(), max_hosts, 1024)),
       orig_cluster_config_(cluster), orig_dfp_config_(config),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
-      cm_(context.clusterManager()),
-      enable_strict_dns_cluster_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_strict_dns_sub_cluster_for_dfp_cluster")) {
+      cm_(context.clusterManager()), max_sub_clusters_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                         config.sub_clusters_config(), max_sub_clusters, 1024)),
+      sub_cluster_ttl_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
+      enable_sub_cluster_(config.has_sub_clusters_config()) {
 
-  if (enable_strict_dns_cluster_) {
+  if (enable_sub_cluster_) {
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(refresh_interval_);
     idle_timer_->enableTimer(ms);
@@ -323,7 +326,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return nullptr;
   }
 
-  if (cluster_.enableStrictDnsCluster()) {
+  if (cluster_.enableSubCluster()) {
     return cluster_.chooseHost(host, context);
   }
 
@@ -429,9 +432,7 @@ ClusterFactory::createClusterWithConfig(
                                                context, context.runtime(), cache_manager_factory,
                                                context.localInfo(), context.addedViaApi());
 
-  // Save the cluster into cluster_info, so that we can get the cluster in the worker thread
-  // through cluster_info.
-  new_cluster->info()->cluster(new_cluster);
+  Common::DynamicForwardProxy::DFPClusterStore::save(new_cluster->info()->name(), new_cluster);
 
   auto& options = new_cluster->info()->upstreamHttpProtocolOptions();
 

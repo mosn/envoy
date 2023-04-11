@@ -75,6 +75,7 @@ message SubClustersConfig {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
   enum DiscoveryType {
+    HOLDER = 0;
     // Refer to the :ref:`strict DNS discovery
     // type<arch_overview_service_discovery_types_strict_dns>`
     // for an explanation.

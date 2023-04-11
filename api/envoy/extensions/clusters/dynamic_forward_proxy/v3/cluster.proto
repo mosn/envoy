@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.dynamic_forward_proxy.v3;
 
+import "envoy/config/cluster/v3/cluster.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
@@ -72,23 +73,10 @@ message ClusterConfig {
 }
 
 message SubClustersConfig {
-  // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
-  // for an explanation on each type.
-  enum DiscoveryType {
-    HOLDER = 0;
-    // Refer to the :ref:`strict DNS discovery
-    // type<arch_overview_service_discovery_types_strict_dns>`
-    // for an explanation.
-    STRICT_DNS = 1;
-
-    // Refer to the :ref:`logical DNS discovery
-    // type<arch_overview_service_discovery_types_logical_dns>`
-    // for an explanation.
-    LOGICAL_DNS = 2;
-  }
-
-  // Only STRICT_DNS and LOGICAL_DNS are supported.
-  DiscoveryType type = 1 [(validate.rules).enum = {defined_only: true}];
+  // The :ref:`service discovery type <arch_overview_service_discovery_types>`
+  // to use for resolving the cluster.
+  // Only STRICT_DNS and LOGICAL_DNS are supported here.
+  config.cluster.v3.Cluster.DiscoveryType type = 1 [(validate.rules).enum = {defined_only: true}];
 
   // The maximum number of sub clusters that the DFP cluster will hold. If not specified defaults to 1024.
   google.protobuf.UInt32Value max_sub_clusters = 2 [(validate.rules).uint32 = {gt: 0}];

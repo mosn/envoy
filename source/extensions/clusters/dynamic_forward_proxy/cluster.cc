@@ -34,14 +34,22 @@ Cluster::Cluster(
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info),
       main_thread_dispatcher_(server_context.mainThreadDispatcher()), orig_cluster_config_(cluster),
-      orig_dfp_config_(config), allow_coalesced_connections_(config.allow_coalesced_connections()),
+      allow_coalesced_connections_(config.allow_coalesced_connections()),
       cm_(context.clusterManager()), max_sub_clusters_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                          config.sub_clusters_config(), max_sub_clusters, 1024)),
       sub_cluster_ttl_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
+      sub_cluster_type_(config.sub_clusters_config().type()),
       enable_sub_cluster_(config.has_sub_clusters_config()) {
 
   if (enable_sub_cluster_) {
+    if (sub_cluster_type_ !=
+            envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_STRICT_DNS &&
+        sub_cluster_type_ !=
+            envoy::config::cluster::v3::Cluster_DiscoveryType::Cluster_DiscoveryType_LOGIC_DNS) {
+      throw EnvoyException(fmt::format("unsupported sub cluster type '{}' in sub_cluster_config",
+                                       sub_cluster_type_));
+    }
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
     idle_timer_->enableTimer(sub_cluster_ttl_);
   }
@@ -113,7 +121,7 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   // Overwrite the type.
   config->set_name(cluster_name);
   config->clear_cluster_type();
-  // config->set_type(orig_dfp_config_.type());
+  config->set_type(sub_cluster_type_);
 
   // Set endpoint.
   auto load_assignments = config->mutable_load_assignment();

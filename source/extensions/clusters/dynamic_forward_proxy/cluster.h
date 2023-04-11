@@ -168,7 +168,6 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& main_thread_dispatcher_;
   const envoy::config::cluster::v3::Cluster orig_cluster_config_;
-  const envoy::extensions::clusters::dynamic_forward_proxy::v3::ClusterConfig orig_dfp_config_;
 
   Event::TimerPtr idle_timer_;
 
@@ -184,6 +183,7 @@ private:
   Upstream::ClusterManager& cm_;
   const size_t max_sub_clusters_{0};
   const std::chrono::milliseconds sub_cluster_ttl_;
+  const envoy::config::cluster::v3::Cluster_DiscoveryType sub_cluster_type_;
   bool enable_sub_cluster_;
 
   friend class ClusterFactory;

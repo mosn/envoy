@@ -43,8 +43,7 @@ Cluster::Cluster(
 
   if (enable_sub_cluster_) {
     idle_timer_ = main_thread_dispatcher_.createTimer([this]() { checkIdleSubCluster(); });
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(sub_cluster_ttl_);
-    idle_timer_->enableTimer(ms);
+    idle_timer_->enableTimer(sub_cluster_ttl_);
   }
 }
 
@@ -87,8 +86,7 @@ void Cluster::checkIdleSubCluster() {
       }
     }
   }
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(sub_cluster_ttl_);
-  idle_timer_->enableTimer(ms);
+  idle_timer_->enableTimer(sub_cluster_ttl_);
 }
 
 std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
@@ -115,7 +113,7 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   // Overwrite the type.
   config->set_name(cluster_name);
   config->clear_cluster_type();
-  config->set_type(orig_dfp_config_.type());
+  // config->set_type(orig_dfp_config_.type());
 
   // Set endpoint.
   auto load_assignments = config->mutable_load_assignment();
@@ -134,7 +132,7 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
 }
 
 Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
-                                                 Upstream::LoadBalancerContext* context) {
+                                                 Upstream::LoadBalancerContext* context) const {
   uint16_t default_port = 80;
   if (info_->transportSocketMatcher().resolve(nullptr).factory_.implementsSecureTransport()) {
     default_port = 443;

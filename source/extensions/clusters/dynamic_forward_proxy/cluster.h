@@ -45,7 +45,7 @@ public:
   bool allowCoalescedConnections() const { return allow_coalesced_connections_; }
   bool enableSubCluster() const { return enable_sub_cluster_; }
   Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
-                                          Upstream::LoadBalancerContext* context);
+                                          Upstream::LoadBalancerContext* context) const;
   std::pair<bool, std::unique_ptr<envoy::config::cluster::v3::Cluster>>
   createSubClusterConfig(const std::string& cluster_name, const std::string& host, const int port);
   bool touch(const std::string& cluster_name);
@@ -78,7 +78,7 @@ private:
   class LoadBalancer : public Upstream::LoadBalancer,
                        public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
   public:
-    LoadBalancer(Cluster& cluster) : cluster_(cluster) {}
+    LoadBalancer(const Cluster& cluster) : cluster_(cluster) {}
 
     // Upstream::LoadBalancer
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
@@ -120,7 +120,7 @@ private:
 
     absl::flat_hash_map<LookupKey, std::vector<ConnectionInfo>, LookupKeyHash> connection_info_map_;
 
-    Cluster& cluster_;
+    const Cluster& cluster_;
   };
 
   class LoadBalancerFactory : public Upstream::LoadBalancerFactory {

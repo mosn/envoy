@@ -274,6 +274,120 @@ typed_config:
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   }
 
+  void initializeFilterManagerBasicFilter(const std::string& so_id, const std::string& domain = "*") {
+    const auto yaml_fmt = R"EOF(
+name: golang
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+  library_id: %s
+  library_path: %s
+  plugin_name: %s
+  plugin_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+    configs:
+      - name: log
+      - name: addHeader
+        config:
+          AddReqHeaderName: "name"
+          AddReqHeaderValue: "value"
+)EOF";
+
+    auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), so_id);
+    config_helper_.prependFilter(yaml_string);
+
+    config_helper_.skipPortUsageValidation();
+
+    config_helper_.addConfigModifier(
+        [domain](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_match()
+              ->set_prefix("/test");
+
+          hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->set_name(
+              "test-route-name");
+          hcm.mutable_route_config()->mutable_virtual_hosts(0)->set_domains(0, domain);
+
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("cluster_0");
+        });
+    config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+    config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+    initialize();
+  }
+
+  void initializeFilterManagerRouteConfig(const std::string& so_id) {
+    config_helper_.addConfigModifier(
+        [so_id](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          // for testing http filter level config, a new virtualhost without per route config
+          auto vh = hcm.mutable_route_config()->add_virtual_hosts();
+          vh->add_domains("filter-level.com");
+          vh->set_name("filter-level.com");
+          auto* rt = vh->add_routes();
+          rt->mutable_match()->set_prefix("/test");
+          rt->mutable_route()->set_cluster("cluster_0");
+
+          // virtualhost level per route config
+          const std::string key = "envoy.filters.http.golang";
+          const auto yaml_fmt =
+              R"EOF(
+              "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute
+              plugins_config:
+                %s:
+                  config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+                    configs:
+                      - name: log
+                      - name: addHeader
+                        config:
+                          AddReqHeaderName: "vhost"
+                          AddReqHeaderValue: "value"
+              )EOF";
+          auto yaml = absl::StrFormat(yaml_fmt, so_id);
+          ProtobufWkt::Any value;
+          TestUtility::loadFromYaml(yaml, value);
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_typed_per_filter_config()
+              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value));
+
+          // route level per route config
+          const auto yaml_fmt2 =
+              R"EOF(
+              "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.ConfigsPerRoute
+              plugins_config:
+                %s:
+                  config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+                    configs:
+                      - name: log
+                      - name: addHeader
+                        config:
+                          AddReqHeaderName: "route"
+                          AddReqHeaderValue: "value"
+              )EOF";
+          auto yaml2 = absl::StrFormat(yaml_fmt2, so_id);
+          ProtobufWkt::Any value2;
+          TestUtility::loadFromYaml(yaml2, value2);
+
+          auto* new_route2 = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+          new_route2->mutable_match()->set_prefix("/route-config-test");
+          new_route2->mutable_typed_per_filter_config()->insert(
+              Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value2));
+          new_route2->mutable_route()->set_cluster("cluster_0");
+        });
+
+    initializeFilterManagerBasicFilter(so_id, "test.com");
+  }
+
   void testBasic(std::string path) {
     initializeBasicFilter(BASIC, "test.com");
 
@@ -695,6 +809,29 @@ typed_config:
     cleanup();
   }
 
+  void testFilterManagerRouteConfig(std::string domain, std::string path, bool header_added) {
+    initializeFilterManagerRouteConfig(FILTERMANAGER);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "GET"}, {":path", path}, {":scheme", "http"}, {":authority", domain}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+    auto response = std::move(encoder_decoder.second);
+
+    waitForNextUpstreamRequest();
+
+    Http::TestResponseHeaderMapImpl response_headers{
+        {":status", "200"}};
+    upstream_request_->encodeHeaders(response_headers, true);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_EQ(header_added, upstream_request_->headers().get(Http::LowerCaseString("req")).empty());
+
+    cleanup();
+  }
+
   const std::string ECHO{"echo"};
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
@@ -703,6 +840,7 @@ typed_config:
   const std::string PROPERTY{"property"};
   const std::string ACCESSLOG{"access_log"};
   const std::string METRIC{"metric"};
+  const std::string FILTERMANAGER{"filtermanager"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -1099,6 +1237,27 @@ TEST_P(GolangIntegrationTest, PanicRecover_EncodeData_Async) {
 // Panic ErrInvalidPhase
 TEST_P(GolangIntegrationTest, PanicRecover_BadAPI) {
   testPanicRecover("/test?badapi=decode-data", "decode-data");
+}
+
+// Using the original config in http filter: (no per route config)
+// remove: x-test-header-0
+// set: foo
+TEST_P(GolangIntegrationTest, RouteConfig_Filter) {
+  testFilterManagerRouteConfig("filter-level.com", "/test", false);
+}
+
+// Using the merged config from http filter & virtualhost level per route config:
+// remove: x-test-header-1
+// set: bar
+TEST_P(GolangIntegrationTest, RouteConfig_VirtualHost) {
+  testFilterManagerRouteConfig("test.com", "/test", true);
+}
+
+// Using the merged config from route level & virtualhost level & http filter:
+// remove: x-test-header-0
+// set: baz
+TEST_P(GolangIntegrationTest, RouteConfig_Route) {
+  testFilterManagerRouteConfig("test.com", "/route-config-test", false);
 }
 
 TEST_P(GolangIntegrationTest, DynamicMetadata) { testDynamicMetadata("/test?dymeta=1"); }

@@ -97,3 +97,12 @@ message ConfigsPerRoute {
   //
   map<string, RouterPlugin> plugins_config = 1;
 }
+
+message FilterManagerConfigPerFilter {
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+  google.protobuf.Any config = 2;
+}
+
+message FilterManagerConfig {
+  repeated FilterManagerConfigPerFilter configs = 1 [(validate.rules).repeated = {min_items: 1}];
+}

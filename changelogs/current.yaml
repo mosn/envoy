@@ -19,6 +19,65 @@ minor_behavior_changes:
 - area: golang
   change: |
     Change ``RegisterHttpFilterConfigFactoryAndParser`` to ``RegisterHttpFilterFactoryAndConfigParser``.
+- area: QUIC
+  change: |
+    Port migration is default turned off. QUIC client connections will no longer attempt to migrate to a new port when connections
+    is degrading. Can be manually turned on via
+    :ref:`port_migration <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.num_timeouts_to_trigger_port_migration>`.
+- area: QUIC
+  change: |
+    Make each upstream connection to read as many as 32 packets in each event loop. This feature can be disabled by setting
+    ``envoy.reloadable_features.quic_upstream_reads_fixed_number_packets`` to false.
+- area: stats
+  change: |
+    ``thread_local_cluster_manager.worker_0.*`` metrics are now parsed to use the
+    ``worker_id`` tag like other metrics with ``worker_id`` do, when
+    :ref:`use_all_default_tags <envoy_v3_api_field_config.metrics.v3.StatsConfig.use_all_default_tags>` is true.
+- area: aws
+  change: |
+    AWS region string is now retrieved from environment and profile consistently within aws_request_signer and
+    grpc_credentials/aws_iam extensions. Region field in aws_request_signer is now optional, explicitly configured
+    xDS region will take preference. aws_request_signer documentation now reflects the region chain.
+- area: http
+  change: |
+    Enable obsolete line folding in BalsaParser (for behavior parity with http-parser, the
+    previously used HTTP/1 parser).
+- area: http
+  change: |
+    When the HTTP CONNECT request method is enabled using :ref:`RouteAction.UpgradeConfig
+    <envoy_v3_api_msg_config.route.v3.RouteAction.UpgradeConfig>`, CONNECT requests will now be
+    proxied to the upstream, unless the :ref:`connect_config
+    <envoy_v3_api_field_config.route.v3.RouteAction.UpgradeConfig.connect_config>` field is also
+    set. (Previously Envoy would terminate CONNECT requests even when the ``connect_config`` field
+    was unset.) The updated behavior should now be consistent with the existing documentation. This
+    change can be reverted by setting
+    ``envoy.reloadable_features.http_route_connect_proxy_by_default`` to ``false``.
+- area: proxy status
+  change: |
+    Add more conversion in the proxy status utility. It can be disabled by the runtime guard
+    ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags``.
+- area: http2
+  change: |
+    Simplifies integration with the codec by removing translation between nghttp2 callbacks and Http2VisitorInterface events.
+    Guarded by ``envoy.reloadable_features.http2_skip_callback_visitor``.
+- area: http3
+  change: |
+    Use GRO (Generic Receive Offload) for reading packets from a client QUIC UDP socket. See
+    https://www.kernel.org/doc/html/next/networking/segmentation-offloads.html for a description of
+    GRO. This behavior change can be reverted by setting
+    ``envoy.reloadable_features.prefer_quic_client_udp_gro`` to ``false``.
+- area: http3
+  change: |
+    Disables recvmmsg (multi-message) for reading packets from a client QUIC UDP socket, if GRO
+    is not set or not supported. recvmsg will be used instead. This behavior change can be
+    reverted by setting ``envoy.reloadable_features.disallow_quic_client_udp_mmsg`` to ``false``.
+- area: xds
+  change: |
+    Delta SDS removals will no longer result in a "Missing SDS resources" NACK
+    and instead will be ignored.
+- area: golang
+  change: |
+    Not implicitly clearing route cache in ``HeaderMap.Set``, introduce a new API ``ClearRouteCache`` to do it.
 
 bug_fixes:
 - area: router

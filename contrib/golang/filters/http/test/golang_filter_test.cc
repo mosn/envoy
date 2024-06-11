@@ -72,12 +72,6 @@ public:
     EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(testing::AnyNumber());
   }
 
-  ~GolangHttpFilterTest() override {
-    if (filter_ != nullptr) {
-      filter_->onDestroy();
-    }
-  }
-
   void setup(const std::string& lib_id, const std::string& lib_path,
              const std::string& plugin_name) {
     const auto yaml_fmt = R"EOF(
@@ -141,6 +135,13 @@ public:
     ON_CALL(*decoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
+  void cleanup() {
+    if (filter_ != nullptr) {
+      filter_->onDestroy();
+    }
+    Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest();
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -170,6 +171,8 @@ TEST_F(GolangHttpFilterTest, ScriptHeadersOnlyRequestHeadersOnly) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   EXPECT_EQ(0, stats_store_.counter("test.golang.errors").value());
+
+  cleanup();
 }
 
 // setHeader at wrong stage
@@ -179,6 +182,9 @@ TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
   auto req = new HttpRequestInternal(*filter_);
 
   EXPECT_EQ(CAPINotInGo, filter_->setHeader(req->decodingState(), "foo", "bar", HeaderSet));
+
+  delete req;
+  cleanup();
 }
 
 // invalid config for routeconfig filter
@@ -186,6 +192,8 @@ TEST_F(GolangHttpFilterTest, InvalidConfigForRouteConfigFilter) {
   InSequence s;
   EXPECT_THROW_WITH_REGEX(setup(ROUTECONFIG, genSoPath(ROUTECONFIG), ROUTECONFIG), EnvoyException,
                           "golang filter failed to parse plugin config");
+
+  cleanup();
 }
 
 } // namespace

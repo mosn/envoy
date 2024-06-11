@@ -321,27 +321,6 @@ func envoyGoRequestSemaDec(r *C.httpRequest) {
 //
 //export envoyGoFilterCleanUp
 func envoyGoFilterCleanUp() {
-	// Clean up all config cache
-	configCache.Range(func(key, value interface{}) bool {
-		configCache.Delete(key)
-		return true
-	})
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	{
-		// create a fake httpRequest to trigger GC finalizer.
-		fake := &httpRequest{}
-		runtime.SetFinalizer(fake, func(*httpRequest) {
-			wg.Done()
-		})
-	}
-
-	api.LogDebugf("golang filter enforcing GC")
-	// enforce a GC cycle.
-	runtime.GC()
-
-	// wait GC finalizers finished.
-	wg.Wait()
+	asanTestEnabled = true
+	forceGCFinalizer()
 }
